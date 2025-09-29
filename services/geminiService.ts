@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { WorkflowStep, StepType, IntegrationId } from '../types';
 import { INTEGRATIONS } from '../constants';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY as string });
 
 const integrationIds = INTEGRATIONS.map(i => i.id);
 
