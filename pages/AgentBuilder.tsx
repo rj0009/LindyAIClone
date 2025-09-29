@@ -13,13 +13,19 @@ interface AgentBuilderProps {
   onCancel: () => void;
 }
 
+interface LogEntry {
+  timestamp: string;
+  status: 'INFO' | 'SUCCESS' | 'FAILURE';
+  text: string;
+}
+
 const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, onSave, onCancel }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [prompt, setPrompt] = useState('');
   const [workflow, setWorkflow] = useState<WorkflowStep[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [runLogs, setRunLogs] = useState<string[]>([]);
+  const [runLogs, setRunLogs] = useState<LogEntry[]>([]);
   const [isAddingStep, setIsAddingStep] = useState(false);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [status, setStatus] = useState<'active' | 'inactive'>('inactive');
@@ -41,6 +47,7 @@ const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, onSave, onCancel }) 
       setStatus('inactive');
       setPrompt('');
     }
+    setRunLogs([]);
   }, [agent]);
 
   const handleGenerateWorkflow = async () => {
@@ -69,11 +76,61 @@ const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, onSave, onCancel }) 
 
   const handleTestRun = () => {
     setRunLogs([]);
+    
+    const addLog = (status: LogEntry['status'], text: string) => {
+        setRunLogs(prev => [...prev, {
+            timestamp: new Date().toLocaleTimeString(),
+            status,
+            text,
+        }]);
+    };
+
+    addLog('INFO', 'Starting test run...');
+
+    let cumulativeDelay = 0;
+
     workflow.forEach((step, index) => {
+        const stepDelay = 700 + Math.random() * 500; // variable delay
+        cumulativeDelay += stepDelay;
+
         setTimeout(() => {
-            const logMessage = `[${new Date().toLocaleTimeString()}] Executing ${step.type}: ${step.description} - SUCCESS`;
-            setRunLogs(prev => [...prev, logMessage]);
-        }, (index + 1) * 700);
+            addLog('INFO', `Executing step ${index + 1}: ${step.description}`);
+            
+            // Simulate success/failure with a small delay
+            setTimeout(() => {
+                const isSuccess = Math.random() > 0.2; // 80% success rate
+                if (isSuccess) {
+                    let output = 'Operation completed.';
+                    switch (step.integrationId) {
+                        case 'gmail':
+                            output = 'Email sent to recipient@example.com.';
+                            break;
+                        case 'slack':
+                            output = 'Message posted to #general channel.';
+                            break;
+                        case 'google_drive':
+                            output = 'File "summary.txt" uploaded successfully.';
+                            break;
+                        case 'hubspot':
+                            output = 'Contact ID 12345 updated.';
+                            break;
+                         case 'salesforce':
+                            output = 'Opportunity status changed to "Closed Won".';
+                            break;
+                        default:
+                            output = `Mock data for ${step.integrationId} processed.`;
+                    }
+                    addLog('SUCCESS', `SUCCESS: ${output}`);
+                } else {
+                    addLog('FAILURE', 'FAILURE: API connection timed out. Please check integration settings.');
+                }
+                
+                if (index === workflow.length - 1) {
+                    setTimeout(() => addLog('INFO', 'Test run finished.'), 500);
+                }
+            }, 300);
+
+        }, cumulativeDelay);
     });
   };
 
@@ -195,7 +252,18 @@ const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, onSave, onCancel }) 
             {runLogs.length === 0 ? (
                 <p className="text-text-secondary">Click 'Test Run' to see execution logs.</p>
             ) : (
-                runLogs.map((log, i) => <p key={i} className="whitespace-pre-wrap">{log}</p>)
+                runLogs.map((log, i) => (
+                    <div key={i} className="flex items-start">
+                        <span className="text-text-secondary mr-3 w-20 flex-shrink-0">[{log.timestamp}]</span>
+                        <p className={`flex-1 whitespace-pre-wrap break-words ${
+                            log.status === 'SUCCESS' ? 'text-green-400' :
+                            log.status === 'FAILURE' ? 'text-red-400' :
+                            'text-text-primary'
+                        }`}>
+                            {log.text}
+                        </p>
+                    </div>
+                ))
             )}
           </div>
         </div>
