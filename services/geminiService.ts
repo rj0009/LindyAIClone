@@ -1,9 +1,23 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { WorkflowStep, StepType, IntegrationId } from '../types';
 import { INTEGRATIONS } from '../constants';
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY as string });
+// Lazily initialize the AI client to prevent app crash if API key is missing.
+let ai: GoogleGenAI | null = null;
+try {
+  // In a browser environment, `process` is not defined. We must check for its existence
+  // to avoid a ReferenceError that would crash the application on startup. Build tools
+  // like Vite can be configured to replace `process.env.API_KEY` at build time.
+  const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+  
+  if (apiKey) {
+    ai = new GoogleGenAI({ apiKey });
+  } else {
+    console.warn("API_KEY environment variable not set or not accessible in this environment. Gemini API features will be disabled.");
+  }
+} catch (error) {
+    console.error("Failed to initialize GoogleGenAI:", error);
+}
 
 const integrationIds = INTEGRATIONS.map(i => i.id);
 
@@ -43,6 +57,15 @@ const responseSchema = {
 };
 
 export const generateWorkflowFromPrompt = async (prompt: string): Promise<WorkflowStep[]> => {
+  // Check if the AI client was initialized.
+  if (!ai) {
+    console.error("Cannot generate workflow: Gemini API client is not initialized. Make sure API_KEY is set and accessible to your application build process.");
+    return [
+        { id: 'error-1', type: StepType.TRIGGER, integrationId: 'webhook', description: 'Error: Gemini API key not configured.', operation: 'apiKeyError' },
+        { id: 'error-2', type: StepType.ACTION, integrationId: 'webhook', description: 'The app is running without AI features. Please configure your environment.', operation: 'apiKeyError' },
+    ];
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -70,7 +93,7 @@ export const generateWorkflowFromPrompt = async (prompt: string): Promise<Workfl
     // Return a sample workflow on error for UI development
     return [
         { id: 'error-1', type: StepType.TRIGGER, integrationId: 'gmail', description: 'Error: Could not generate workflow.', operation: 'apiError' },
-        { id: 'error-2', type: StepType.ACTION, integrationId: 'slack', description: 'Please check your API key and try again.', operation: 'apiError' },
+        { id: 'error-2', type: StepType.ACTION, integrationId: 'slack', description: 'Please check your API key and network connection.', operation: 'apiError' },
     ];
   }
 };
