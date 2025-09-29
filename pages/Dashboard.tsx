@@ -6,9 +6,10 @@ import { ICONS } from '../constants';
 
 interface AgentCardProps {
     agent: Agent;
+    onEdit: (agent: Agent) => void;
 }
 
-const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
+const AgentCard: React.FC<AgentCardProps> = ({ agent, onEdit }) => {
     return (
         <div className="bg-secondary p-6 rounded-lg border border-border hover:border-accent transition-colors flex flex-col h-full">
             <div className="flex-1">
@@ -30,8 +31,8 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
                          {agent.workflow.length > 5 && <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary text-xs text-text-secondary">+{agent.workflow.length - 5}</div>}
                     </div>
                 </div>
-                <button className="w-full text-center bg-primary py-2 px-4 rounded-lg border border-border hover:bg-border transition-colors">
-                    View Details
+                <button onClick={() => onEdit(agent)} className="w-full text-center bg-primary py-2 px-4 rounded-lg border border-border hover:bg-border transition-colors">
+                    View / Edit
                 </button>
             </div>
         </div>
@@ -41,9 +42,10 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
 interface DashboardProps {
     agents: Agent[];
     onNewAgent: () => void;
+    onEditAgent: (agent: Agent) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ agents, onNewAgent }) => {
+const Dashboard: React.FC<DashboardProps> = ({ agents, onNewAgent, onEditAgent }) => {
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
@@ -56,7 +58,7 @@ const Dashboard: React.FC<DashboardProps> = ({ agents, onNewAgent }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {agents.map(agent => (
-            <AgentCard key={agent.id} agent={agent} />
+            <AgentCard key={agent.id} agent={agent} onEdit={onEditAgent} />
         ))}
         {agents.length === 0 && (
             <div className="col-span-full text-center py-16 border-2 border-dashed border-border rounded-lg">

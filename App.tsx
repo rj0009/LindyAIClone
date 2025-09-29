@@ -4,7 +4,7 @@ import Dashboard from './pages/Dashboard';
 import AgentBuilder from './pages/AgentBuilder';
 import Templates from './pages/Templates';
 import Integrations from './pages/Integrations';
-import { Agent } from './types';
+import { Agent, Template } from './types';
 import { AGENT_TEMPLATES } from './constants';
 
 type Page = 'dashboard' | 'templates' | 'integrations' | 'builder';
@@ -59,24 +59,58 @@ const Sidebar: React.FC<{ currentPage: Page; setPage: (page: Page) => void }> = 
 const App: React.FC = () => {
   const [page, setPage] = useState<Page>('dashboard');
   const [agents, setAgents] = useState<Agent[]>(initialAgents);
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
 
-  const handleSaveAgent = (agent: Agent) => {
-    setAgents(prev => [...prev, agent]);
+  const handleSaveAgent = (agentToSave: Agent) => {
+    if (agents.some(a => a.id === agentToSave.id)) {
+      setAgents(prev => prev.map(a => a.id === agentToSave.id ? agentToSave : a));
+    } else {
+      setAgents(prev => [...prev, agentToSave]);
+    }
+    setEditingAgent(null);
     setPage('dashboard');
   };
+
+  const handleStartCreateAgent = () => {
+    setEditingAgent(null);
+    setPage('builder');
+  };
+
+  const handleStartEditAgent = (agent: Agent) => {
+    setEditingAgent(agent);
+    setPage('builder');
+  };
+
+  const handleUseTemplate = (template: Template) => {
+    const agentFromTemplate: Agent = {
+        id: `agent-${Date.now()}`,
+        name: template.name,
+        description: template.description,
+        workflow: template.workflow,
+        status: 'inactive',
+    };
+    setEditingAgent(agentFromTemplate);
+    setPage('builder');
+  };
+
+  const handleCancelBuilder = () => {
+    setEditingAgent(null);
+    setPage('dashboard');
+  }
+
 
   const renderPage = () => {
     switch (page) {
       case 'dashboard':
-        return <Dashboard agents={agents} onNewAgent={() => setPage('builder')} />;
+        return <Dashboard agents={agents} onNewAgent={handleStartCreateAgent} onEditAgent={handleStartEditAgent} />;
       case 'builder':
-        return <AgentBuilder onSave={handleSaveAgent} onCancel={() => setPage('dashboard')} />;
+        return <AgentBuilder agent={editingAgent} onSave={handleSaveAgent} onCancel={handleCancelBuilder} />;
       case 'templates':
-          return <Templates />;
+          return <Templates onUseTemplate={handleUseTemplate} />;
       case 'integrations':
           return <Integrations />;
       default:
-        return <Dashboard agents={agents} onNewAgent={() => setPage('builder')} />;
+        return <Dashboard agents={agents} onNewAgent={handleStartCreateAgent} onEditAgent={handleStartEditAgent} />;
     }
   };
 
