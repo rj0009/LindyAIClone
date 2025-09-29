@@ -85,4 +85,6 @@ export const AGENT_TEMPLATES: Template[] = [
     workflow: [
       { id: '1', type: StepType.TRIGGER, integrationId: 'hubspot', description: 'On new contact created', operation: 'onNewContact' },
       { id: '2', type: StepType.ACTION, integrationId: 'gmail', description: 'Send introductory email', operation: 'sendEmail' },
-    ]];
+    ]
+  }
+];
