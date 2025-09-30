@@ -1,5 +1,5 @@
 import React from 'react';
-import { Template, IntegrationId, StepType } from './types';
+import { Template, IntegrationId, StepType, Integration } from './types';
 
 // FIX: Replaced JSX.Element with React.ReactElement to resolve namespace issue.
 export const ICONS: { [key: string]: React.ReactElement } = {
@@ -38,24 +38,77 @@ export const ICONS: { [key: string]: React.ReactElement } = {
   ),
   log: (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v6"></path><path d="M2 12h10"></path><path d="m2 16 3-3 3 3"></path><path d="M15 6h2"></path><path d="M15 10h5"></path><path d="M15 14h5"></path></svg>
-  )
+  ),
+  x: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+  ),
+  grip_vertical: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+  ),
+  settings: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.4l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2.4l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+  ),
+  arrow_down: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+  ),
+  arrow_left: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+  ),
+  users: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+  ),
+  filter: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+  ),
+  variable: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+  ),
 };
 
-export const INTEGRATIONS: {
-  id: IntegrationId;
-  name: string;
-  description: string;
-  color: string;
-  // FIX: Replaced JSX.Element with React.ReactElement to resolve namespace issue.
-  icon: React.ReactElement;
-}[] = [
-  { id: 'gmail', name: 'Gmail', description: 'Read, send, and manage emails.', color: '#EA4335', icon: ICONS.gmail },
-  { id: 'google_calendar', name: 'Google Calendar', description: 'Create and manage calendar events.', color: '#4285F4', icon: ICONS.google_calendar },
-  { id: 'slack', name: 'Slack', description: 'Send messages to channels and users.', color: '#4A154B', icon: ICONS.slack },
-  { id: 'hubspot', name: 'HubSpot', description: 'Manage contacts and deals.', color: '#FF7A59', icon: ICONS.hubspot },
-  { id: 'salesforce', name: 'Salesforce', description: 'Update CRM records.', color: '#00A1E0', icon: ICONS.salesforce },
-  { id: 'google_drive', name: 'Google Drive', description: 'Manage files and folders.', color: '#4285F4', icon: ICONS.google_drive },
-  { id: 'webhook', name: 'Webhook', description: 'Trigger workflows from external services.', color: '#30363D', icon: ICONS.webhook },
+export const INTEGRATIONS: Integration[] = [
+  { id: 'gmail', name: 'Gmail', description: 'Read, send, and manage emails.', color: '#EA4335', icon: ICONS.gmail, operations: [
+      { id: 'onNewEmail', name: 'On New Email', description: 'Triggers when a new email is received.', parameters: { from: '*', subjectContains: '' }, outputs: [
+        { id: 'from', name: 'Sender Email' },
+        { id: 'subject', name: 'Email Subject' },
+        { id: 'body', name: 'Email Body' },
+      ]},
+      { id: 'sendEmail', name: 'Send Email', description: 'Compose and send a new email.', parameters: { recipient: '', subject: '', body: '' } },
+      { id: 'createDraft', name: 'Create Draft', description: 'Save a new email as a draft.', parameters: { recipient: '', subject: '', body: '' } },
+  ]},
+  { id: 'ai', name: 'AI Action', description: 'Use AI to generate text or analyze data.', color: '#A371F7', icon: ICONS.zap, operations: [
+      { id: 'generateText', name: 'Generate Text', description: 'Generates text content based on a prompt.', parameters: { prompt: '' }, outputs: [
+        { id: 'response', name: 'Generated Text' }
+      ]},
+      { id: 'analyzeText', name: 'Analyze & Decide', description: 'Analyzes text and outputs a structured response.', parameters: { input: '', prompt: 'Analyze the text and categorize it. Example: "Is this a sales or tech question?"' }, outputs: [
+        { id: 'output', name: 'Analysis Result' }
+      ]},
+  ]},
+  { id: 'control', name: 'Control', description: 'Add logic like branches and filters.', color: '#FB923C', icon: ICONS.filter, operations: [
+      { id: 'filter', name: 'Only continue if...', description: 'Adds a conditional filter to a workflow branch.', parameters: { input: '', condition: 'contains', value: '' } },
+  ]},
+  { id: 'agent', name: 'Agent', description: 'Trigger another agent to run.', color: '#6366F1', icon: ICONS.users, operations: [
+      { id: 'callAgent', name: 'Call Agent', description: 'Executes another agent as part of this workflow.', parameters: { agentId: '' } },
+  ]},
+  { id: 'slack', name: 'Slack', description: 'Send messages to channels and users.', color: '#4A154B', icon: ICONS.slack, operations: [
+      { id: 'sendMessage', name: 'Send Message', description: 'Send a message to a channel or user.', parameters: { channel: '#general', message: '' } },
+  ]},
+  { id: 'google_calendar', name: 'Google Calendar', description: 'Create and manage calendar events.', color: '#4285F4', icon: ICONS.google_calendar, operations: [
+    { id: 'createEvent', name: 'Create Event', description: 'Create a new event in a calendar.', parameters: { title: '', date: '', time: '', description: '' } },
+  ]},
+  { id: 'hubspot', name: 'HubSpot', description: 'Manage contacts and deals.', color: '#FF7A59', icon: ICONS.hubspot, operations: [
+      { id: 'onNewContact', name: 'On New Contact', description: 'Triggers when a new contact is created.', parameters: {} },
+      { id: 'createContact', name: 'Create Contact', description: 'Create a new contact record.', parameters: { email: '', name: '' } },
+  ]},
+  { id: 'salesforce', name: 'Salesforce', description: 'Update CRM records.', color: '#00A1E0', icon: ICONS.salesforce, operations: [
+      { id: 'createRecord', name: 'Create Record', description: 'Create a new record (e.g., Lead, Account).', parameters: { object: 'Lead', fields: {} } },
+  ]},
+  { id: 'google_drive', name: 'Google Drive', description: 'Manage files and folders.', color: '#4285F4', icon: ICONS.google_drive, operations: [
+      { id: 'uploadFile', name: 'Upload File', description: 'Upload a new file to a folder.', parameters: { folder: 'root', fileName: 'file.txt', content: '' } },
+  ]},
+  { id: 'webhook', name: 'Webhook', description: 'Trigger workflows from external services.', color: '#30363D', icon: ICONS.webhook, operations: [
+      { id: 'onWebhook', name: 'On Webhook Call', description: 'Triggers when an HTTP request is received.', parameters: { url: 'https://yourapp.com/webhook/...' } },
+      { id: 'callWebhook', name: 'Call Webhook', description: 'Send an HTTP POST request to a URL.', parameters: { url: '', data: {} } },
+  ]},
 ];
 
 export const AGENT_TEMPLATES: Template[] = [
@@ -63,28 +116,35 @@ export const AGENT_TEMPLATES: Template[] = [
     id: 'template-1',
     name: 'Email Triage',
     description: 'Categorize incoming emails and drafts replies for urgent items.',
-    workflow: [
-      { id: '1', type: StepType.TRIGGER, integrationId: 'gmail', description: 'On new email received', operation: 'onNewEmail' },
-      { id: '2', type: StepType.ACTION, integrationId: 'slack', description: 'Notify team in #triage channel', operation: 'sendMessage' },
+    trigger: { id: '1', type: StepType.TRIGGER, integrationId: 'gmail', name: 'On new email received', operation: 'onNewEmail', parameters: { from: '*', subjectContains: 'urgent' } },
+    actions: [
+      [
+        { id: '2', type: StepType.ACTION, integrationId: 'slack', name: 'Notify team in #triage channel', operation: 'sendMessage', parameters: { channel: '#triage', message: 'New urgent email received from {{outputs.1.from}}' } },
+      ]
     ]
   },
   {
     id: 'template-2',
     name: 'Meeting Summarizer',
     description: 'Generate a summary and action items from a meeting transcript.',
-    workflow: [
-      { id: '1', type: StepType.TRIGGER, integrationId: 'webhook', description: 'On new transcript uploaded', operation: 'onWebhook' },
-      { id: '2', type: StepType.ACTION, integrationId: 'google_drive', description: 'Save summary to Google Drive', operation: 'uploadFile' },
-      { id: '3', type: StepType.ACTION, integrationId: 'gmail', description: 'Email summary to attendees', operation: 'sendEmail' },
+    trigger: { id: '1', type: StepType.TRIGGER, integrationId: 'webhook', name: 'On new transcript uploaded', operation: 'onWebhook', parameters: { url: 'https://yourapp.com/webhook/transcript' } },
+    actions: [
+      [
+        { id: 'ai-1', type: StepType.ACTION, integrationId: 'ai', name: 'Summarize Transcript', operation: 'generateText', parameters: { prompt: 'Summarize the following meeting transcript and list key action items: {{outputs.1.body}}'} },
+        { id: '2', type: StepType.ACTION, integrationId: 'google_drive', name: 'Save summary to Google Drive', operation: 'uploadFile', parameters: { fileName: 'summary.txt', content: '{{outputs.ai-1.response}}' } },
+        { id: '3', type: StepType.ACTION, integrationId: 'gmail', name: 'Email summary to attendees', operation: 'sendEmail', parameters: { recipient: 'attendees@example.com', subject: 'Meeting Summary', body: 'Please find the summary attached.' } },
+      ]
     ]
   },
   {
     id: 'template-3',
     name: 'Sales Outreach',
     description: 'Automatically follow up with new leads from HubSpot.',
-    workflow: [
-      { id: '1', type: StepType.TRIGGER, integrationId: 'hubspot', description: 'On new contact created', operation: 'onNewContact' },
-      { id: '2', type: StepType.ACTION, integrationId: 'gmail', description: 'Send introductory email', operation: 'sendEmail' },
+    trigger: { id: '1', type: StepType.TRIGGER, integrationId: 'hubspot', name: 'On new contact created', operation: 'onNewContact', parameters: {} },
+    actions: [
+      [
+        { id: '2', type: StepType.ACTION, integrationId: 'gmail', name: 'Send introductory email', operation: 'sendEmail', parameters: { recipient: '{{outputs.1.email}}', subject: 'Following up!', body: 'Hi {{outputs.1.name}}, thanks for your interest!' } },
+      ]
     ]
   }
 ];

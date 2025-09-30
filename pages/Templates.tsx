@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Template } from '../types';
 import { AGENT_TEMPLATES, ICONS } from '../constants';
@@ -10,6 +9,7 @@ interface TemplateCardProps {
 }
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ template, onUse }) => {
+    const allSteps = [template.trigger, ...template.actions.flat()].filter(Boolean);
     return (
         <div className="bg-secondary p-6 rounded-lg border border-border hover:border-accent transition-colors flex flex-col h-full">
             <div className="flex-1">
@@ -20,7 +20,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onUse }) => {
                  <div className="flex items-center mb-4">
                     <span className="text-sm text-text-secondary mr-2">Integrations:</span>
                     <div className="flex space-x-1">
-                        {template.workflow.map(step => (
+                        {allSteps.map(step => (
                             <IntegrationIcon key={step.id} integrationId={step.integrationId} className="w-6 h-6" />
                         ))}
                     </div>

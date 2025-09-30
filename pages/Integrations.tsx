@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { INTEGRATIONS } from '../constants';
 import IntegrationIcon from '../components/IntegrationIcon';
 import { IntegrationId } from '../types';
+import IntegrationModal from '../components/IntegrationModal';
 
 interface IntegrationCardProps {
     integration: typeof INTEGRATIONS[0];
@@ -32,20 +32,33 @@ const IntegrationCard: React.FC<IntegrationCardProps> = ({ integration, isConnec
     );
 };
 
-const Integrations: React.FC = () => {
-    const [connected, setConnected] = useState<Set<IntegrationId>>(new Set(['gmail', 'slack']));
+interface IntegrationsProps {
+    connected: Set<IntegrationId>;
+    onToggleIntegration: (id: IntegrationId) => void;
+}
 
-    const toggleConnection = (id: IntegrationId) => {
-        setConnected(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) {
-                newSet.delete(id);
-            } else {
-                newSet.add(id);
-            }
-            return newSet;
-        });
+const Integrations: React.FC<IntegrationsProps> = ({ connected, onToggleIntegration }) => {
+    const [selectedIntegrationId, setSelectedIntegrationId] = useState<IntegrationId | null>(null);
+
+    const handleToggleClick = (id: IntegrationId) => {
+        if (connected.has(id)) {
+            onToggleIntegration(id); // Disconnect directly
+        } else {
+            setSelectedIntegrationId(id); // Open modal to connect
+        }
     };
+
+    const handleConnect = () => {
+        if (selectedIntegrationId) {
+            onToggleIntegration(selectedIntegrationId);
+            setSelectedIntegrationId(null);
+        }
+    };
+    
+    const handleCloseModal = () => {
+        setSelectedIntegrationId(null);
+    };
+
 
     return (
         <div className="p-8">
@@ -56,10 +69,17 @@ const Integrations: React.FC = () => {
                         key={integration.id} 
                         integration={integration} 
                         isConnected={connected.has(integration.id)}
-                        onToggle={() => toggleConnection(integration.id)}
+                        onToggle={() => handleToggleClick(integration.id)}
                     />
                 ))}
             </div>
+            {selectedIntegrationId && (
+                <IntegrationModal 
+                    integrationId={selectedIntegrationId}
+                    onConnect={handleConnect}
+                    onClose={handleCloseModal}
+                />
+            )}
         </div>
     );
 };
