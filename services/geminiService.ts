@@ -8,7 +8,16 @@ try {
   // In a browser environment, `process` is not defined. We must check for its existence
   // to avoid a ReferenceError that would crash the application on startup. Build tools
   // like Vite can be configured to replace `process.env.API_KEY` at build time.
- const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+  
+  if (apiKey) {
+    ai = new GoogleGenAI({ apiKey });
+  } else {
+    console.warn("API_KEY environment variable not set or not accessible in this environment. Gemini API features will be disabled.");
+  }
+} catch (error) {
+    console.error("Failed to initialize GoogleGenAI:", error);
+}
 
 const integrationIds = INTEGRATIONS.map(i => i.id);
 

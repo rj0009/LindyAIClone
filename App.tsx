@@ -162,7 +162,7 @@ const App: React.FC = () => {
   const [page, setPage] = useState<Page>('dashboard');
   const [agents, setAgents] = useLocalStorage<Agent[]>('agents', initialAgents);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [connectedIntegrations, setConnectedIntegrations] = useState<Set<IntegrationId>>(new Set(['slack', 'ai', 'gmail', 'control', 'agent']));
+  const [connectedIntegrations, setConnectedIntegrations] = useLocalStorage<Set<IntegrationId>>('connectedIntegrations', new Set(['slack', 'ai', 'gmail', 'control', 'agent']));
   const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
 
   const handleToggleStatus = (agentId: string) => {
