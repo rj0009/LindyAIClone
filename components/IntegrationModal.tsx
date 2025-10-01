@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ICONS, INTEGRATIONS } from '../constants';
 import IntegrationIcon from './IntegrationIcon';
@@ -52,14 +53,14 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({ integrationId, onCo
             <IntegrationIcon integrationId={integration.id} className="w-16 h-16" />
             <h2 className="text-2xl font-bold mt-4 text-text-primary">Connect to {integration.name}</h2>
             <p className="mt-2 text-text-secondary">
-                Lindy.ai is requesting permission to access your {integration.name} account.
+                AgenticGov.ai is requesting permission to access your {integration.name} account.
             </p>
         </div>
 
         <div className="my-6 border-t border-border"></div>
 
         <div className="text-left">
-            <h3 className="font-semibold text-text-primary mb-3">This will allow Lindy.ai to:</h3>
+            <h3 className="font-semibold text-text-primary mb-3">This will allow AgenticGov.ai to:</h3>
             <ul className="space-y-2">
                 {permissions.map((permission, index) => (
                     <li key={index} className="flex items-start">
@@ -73,7 +74,7 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({ integrationId, onCo
         <div className="my-6 border-t border-border"></div>
 
         <p className="text-xs text-text-secondary text-center">
-            By clicking "Allow Connection", you agree to Lindy.ai's Terms of Service and Privacy Policy. You can revoke access at any time from your account settings.
+            By clicking "Allow Connection", you agree to AgenticGov.ai's Terms of Service and Privacy Policy. You can revoke access at any time from your account settings.
         </p>
         
         <div className="mt-6 flex flex-col sm:flex-row-reverse gap-3">
