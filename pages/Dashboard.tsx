@@ -10,6 +10,7 @@ interface AgentCardProps {
     onToggleStatus: (agentId: string) => void;
     onRun: (agentId: string) => void;
     isRunning: boolean;
+    onDelete: (agentId: string) => void;
 }
 
 const formatTimeAgo = (isoDateString: string | null): string => {
@@ -70,10 +71,16 @@ const ToggleSwitch: React.FC<{checked: boolean, onChange: () => void}> = ({ chec
     </button>
   );
 
-const AgentCard: React.FC<AgentCardProps> = ({ agent, onEdit, onToggleStatus, onRun, isRunning }) => {
+const AgentCard: React.FC<AgentCardProps> = ({ agent, onEdit, onToggleStatus, onRun, isRunning, onDelete }) => {
     const successRate = agent.totalRuns > 0 ? (agent.successfulRuns / agent.totalRuns) * 100 : 0;
     const lastRunTime = formatTimeAgo(agent.lastRun);
     const allSteps = [agent.trigger, ...agent.actions.flat()].filter(Boolean);
+
+    const handleDelete = () => {
+        if (window.confirm(`Are you sure you want to delete the agent "${agent.name}"? This action cannot be undone.`)) {
+            onDelete(agent.id);
+        }
+    };
 
 
     return (
@@ -86,6 +93,13 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onEdit, onToggleStatus, on
                             {agent.status === 'active' ? 'Active' : 'Inactive'}
                         </span>
                         <ToggleSwitch checked={agent.status === 'active'} onChange={() => onToggleStatus(agent.id)} />
+                        <button
+                            onClick={handleDelete}
+                            className="p-1 text-text-secondary hover:text-red-500 transition-colors"
+                            aria-label={`Delete agent ${agent.name}`}
+                        >
+                            {ICONS.trash}
+                        </button>
                     </div>
                 </div>
                 <p className="text-text-secondary text-sm mb-4 h-10 overflow-hidden">{agent.description}</p>
@@ -140,9 +154,10 @@ interface DashboardProps {
     onToggleStatus: (agentId: string) => void;
     onRunAgent: (agentId: string) => void;
     runningAgentId: string | null;
+    onDeleteAgent: (agentId: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ agents, onNewAgent, onEditAgent, onToggleStatus, onRunAgent, runningAgentId }) => {
+const Dashboard: React.FC<DashboardProps> = ({ agents, onNewAgent, onEditAgent, onToggleStatus, onRunAgent, runningAgentId, onDeleteAgent }) => {
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
@@ -162,6 +177,7 @@ const Dashboard: React.FC<DashboardProps> = ({ agents, onNewAgent, onEditAgent, 
                 onToggleStatus={onToggleStatus} 
                 onRun={onRunAgent}
                 isRunning={runningAgentId === agent.id}
+                onDelete={onDeleteAgent}
             />
         ))}
         {agents.length === 0 && (

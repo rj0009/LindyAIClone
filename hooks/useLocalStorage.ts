@@ -12,11 +12,18 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
     try {
       const item = window.localStorage.getItem(key);
       if (item === null) {
-          // Seed localStorage if it's empty for this key
-          window.localStorage.setItem(key, JSON.stringify(initialValue));
+          // Seed localStorage if it's empty for this key.
+          // If the initial value is a Set, convert it to an array for storage.
+          const valueToStore = initialValue instanceof Set ? Array.from(initialValue) : initialValue;
+          window.localStorage.setItem(key, JSON.stringify(valueToStore));
           return initialValue;
       }
-      return JSON.parse(item);
+      const parsed = JSON.parse(item);
+      // If the initial value was a Set and we're reading an array, convert it back to a Set.
+      if (initialValue instanceof Set && Array.isArray(parsed)) {
+        return new Set(parsed) as T;
+      }
+      return parsed;
     } catch (error) {
       console.warn(`Error reading localStorage key “${key}”:`, error);
       return initialValue;
@@ -35,8 +42,9 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       // Save state
       setStoredValue(valueToStore);
-      // Save to local storage
-      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      // If the value is a Set, convert it to an array before storing.
+      const storableValue = valueToStore instanceof Set ? Array.from(valueToStore) : valueToStore;
+      window.localStorage.setItem(key, JSON.stringify(storableValue));
     } catch (error) {
       console.warn(`Error setting localStorage key “${key}”:`, error);
     }
@@ -47,7 +55,13 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === key && event.newValue) {
           try {
-            setStoredValue(JSON.parse(event.newValue));
+            const parsed = JSON.parse(event.newValue);
+            // Also handle Set conversion for storage events
+            if (initialValue instanceof Set && Array.isArray(parsed)) {
+                setStoredValue(new Set(parsed) as T);
+            } else {
+                setStoredValue(parsed);
+            }
           } catch (error) {
             console.warn(`Error parsing localStorage key “${key}” on storage event:`, error);
           }
@@ -59,7 +73,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [key]);
+  }, [key, initialValue]);
 
   return [storedValue, setValue];
 }
