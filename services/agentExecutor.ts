@@ -87,7 +87,7 @@ const runBranch = async (
                 }
                 default: {
                     // Simulate other steps
-                    stepSuccess = Math.random() > 0.1; // 90% success rate
+                    stepSuccess = true; // Always succeed for test runs
                 }
             }
         } catch (e: any) {
@@ -129,7 +129,7 @@ export const runAgentWorkflow = async (
     // 1. Execute and Simulate Trigger Output
     onLog({ timestamp: new Date().toLocaleTimeString(), status: 'INFO', text: `Executing trigger: "${trigger.name}"` });
     await new Promise(resolve => setTimeout(resolve, 500));
-    const triggerSuccess = Math.random() > 0.05;
+    const triggerSuccess = true; // Always succeed for test runs
 
     if (!triggerSuccess) {
         onLog({ timestamp: new Date().toLocaleTimeString(), status: 'FAILURE', text: 'FAILURE: Trigger failed to execute.' });

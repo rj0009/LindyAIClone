@@ -6,6 +6,7 @@ import Integrations from './pages/Integrations';
 import { Agent, Template, IntegrationId, StepType } from './types';
 import { AGENT_TEMPLATES } from './constants';
 import { runAgentWorkflow } from './services/agentExecutor';
+import useLocalStorage from './hooks/useLocalStorage';
 
 type Page = 'dashboard' | 'templates' | 'integrations' | 'builder';
 
@@ -159,7 +160,7 @@ const Sidebar: React.FC<{ currentPage: Page; setPage: (page: Page) => void }> = 
 
 const App: React.FC = () => {
   const [page, setPage] = useState<Page>('dashboard');
-  const [agents, setAgents] = useState<Agent[]>(initialAgents);
+  const [agents, setAgents] = useLocalStorage<Agent[]>('agents', initialAgents);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [connectedIntegrations, setConnectedIntegrations] = useState<Set<IntegrationId>>(new Set(['slack', 'ai', 'gmail', 'control', 'agent']));
   const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
@@ -207,11 +208,14 @@ const App: React.FC = () => {
   };
 
   const handleSaveAgent = (agentToSave: Agent) => {
-    if (agents.some(a => a.id === agentToSave.id)) {
-      setAgents(prev => prev.map(a => a.id === agentToSave.id ? agentToSave : a));
-    } else {
-      setAgents(prev => [...prev, agentToSave]);
-    }
+    setAgents(prev => {
+        const agentExists = prev.some(a => a.id === agentToSave.id);
+        if (agentExists) {
+            return prev.map(a => a.id === agentToSave.id ? agentToSave : a);
+        } else {
+            return [...prev, agentToSave];
+        }
+    });
     setEditingAgent(null);
     setPage('dashboard');
   };

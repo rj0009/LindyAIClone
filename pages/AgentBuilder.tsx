@@ -21,7 +21,22 @@ const DropIndicator = () => (
     </div>
 );
 
-const ActionBranch = ({ branch, branchIndex, onDeleteStep, onSelectStep, selectedStepId, onAddStep, onDragStart, onDragOver, onDrop, draggedItemId, dropTarget }) => {
+// FIX: Add explicit props type for ActionBranch to resolve TypeScript error with 'key' prop.
+interface ActionBranchProps {
+    branch: WorkflowStep[];
+    branchIndex: number;
+    onDeleteStep: (branchIndex: number, stepIndex: number) => void;
+    onSelectStep: (id: string) => void;
+    selectedStepId: string | null;
+    onAddStep: (branchIndex: number, integration: Integration, operation: IntegrationOperation) => void;
+    onDragStart: (e: React.DragEvent, location: { branchIndex: number; stepIndex: number; }) => void;
+    onDragOver: (e: React.DragEvent, location: { branchIndex: number; stepIndex: number; }) => void;
+    onDrop: (e: React.DragEvent, targetBranchIndex: number) => void;
+    draggedItemId: { branchIndex: number; stepIndex: number; } | null;
+    dropTarget: { branchIndex: number; stepIndex: number; } | null;
+}
+
+const ActionBranch: React.FC<ActionBranchProps> = ({ branch, branchIndex, onDeleteStep, onSelectStep, selectedStepId, onAddStep, onDragStart, onDragOver, onDrop, draggedItemId, dropTarget }) => {
     return (
         <div className="flex-1 min-w-[300px] bg-primary p-4 rounded-lg border border-border">
             <div 
