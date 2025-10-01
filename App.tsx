@@ -1,12 +1,15 @@
+
+
 import React, { useState } from 'react';
 import Dashboard from './pages/Dashboard';
 import AgentBuilder from './pages/AgentBuilder';
 import Templates from './pages/Templates';
 import Integrations from './pages/Integrations';
-import { Agent, Template, IntegrationId, StepType } from './types';
+import { Agent, Template, IntegrationId, StepType, LogEntry } from './types';
 import { AGENT_TEMPLATES } from './constants';
 import { runAgentWorkflow } from './services/agentExecutor';
 import useLocalStorage from './hooks/useLocalStorage';
+import TestRunModal from './components/TestRunModal';
 
 type Page = 'dashboard' | 'templates' | 'integrations' | 'builder';
 
@@ -15,6 +18,7 @@ const initialAgents: Agent[] = [
         id: 'agent-dispatcher',
         name: 'Email Dispatcher',
         description: 'Receives any email, uses AI to classify it as "tech" or "sales", then calls the appropriate sub-agent.',
+        systemPrompt: 'You are a helpful email classification agent. Your goal is to determine if an email is a "sales" or a "tech" enquiry. Respond with only one word: sales or tech.',
         trigger: { 
             id: 'disp-t-1', 
             type: StepType.TRIGGER, 
@@ -31,7 +35,7 @@ const initialAgents: Agent[] = [
                     integrationId: 'ai', 
                     name: 'Classify Email', 
                     operation: 'analyzeText', 
-                    parameters: { input: '{{outputs.disp-t-1.body}}', prompt: 'Read this email and determine if it is a "sales" or a "tech" enquiry. Respond with only one word: sales or tech.' } 
+                    parameters: { input: '{{outputs.disp-t-1.body}}', prompt: 'Is this a "sales" or "tech" email? Respond with only one word.' } 
                 },
                 {
                     id: 'disp-f-1',
@@ -57,7 +61,7 @@ const initialAgents: Agent[] = [
                     integrationId: 'ai', 
                     name: 'Classify Email', 
                     operation: 'analyzeText', 
-                    parameters: { input: '{{outputs.disp-t-1.body}}', prompt: 'Read this email and determine if it is a "sales" or a "tech" enquiry. Respond with only one word: sales or tech.' } 
+                    parameters: { input: '{{outputs.disp-t-1.body}}', prompt: 'Is this a "sales" or "tech" email? Respond with only one word.' } 
                 },
                  {
                     id: 'disp-f-2',
@@ -86,6 +90,7 @@ const initialAgents: Agent[] = [
         id: 'agent-sales',
         name: 'Sales Team Agent',
         description: 'Receives a sales lead and posts a notification to the #sales Slack channel.',
+        systemPrompt: 'You are an agent responsible for sales notifications.',
         trigger: null,
         actions: [
             [
@@ -108,6 +113,7 @@ const initialAgents: Agent[] = [
         id: 'agent-tech',
         name: 'Technical Support Agent',
         description: 'Receives a tech support query and posts a notification to the #support Slack channel.',
+        systemPrompt: 'You are an agent responsible for technical support notifications.',
         trigger: null,
         actions: [
             [
@@ -162,8 +168,11 @@ const App: React.FC = () => {
   const [page, setPage] = useState<Page>('dashboard');
   const [agents, setAgents] = useLocalStorage<Agent[]>('agents', initialAgents);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [connectedIntegrations, setConnectedIntegrations] = useLocalStorage<Set<IntegrationId>>('connectedIntegrations', new Set(['slack', 'ai', 'gmail', 'control', 'agent']));
+  const [connectedIntegrations, setConnectedIntegrations] = useLocalStorage<Set<IntegrationId>>('connectedIntegrations', new Set(['slack', 'ai', 'gmail', 'control', 'agent', 'webhook']));
   const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
+  const [agentToTest, setAgentToTest] = useState<Agent | null>(null);
+  const [runLogs, setRunLogs] = useState<LogEntry[]>([]);
+
 
   const handleToggleStatus = (agentId: string) => {
     setAgents(prev => prev.map(a => 
@@ -185,16 +194,33 @@ const App: React.FC = () => {
     });
   };
   
-  const handleRunAgent = async (agentId: string) => {
+  const handleInitiateTestRun = (agentId: string) => {
     const agent = agents.find(a => a.id === agentId);
     if (!agent || runningAgentId) return;
 
-    setRunningAgentId(agentId);
+    // For agents with triggers that need input, show modal. Otherwise, run directly.
+    if (agent.trigger && ['gmail', 'webhook'].includes(agent.trigger.integrationId)) {
+        setAgentToTest(agent);
+    } else {
+        executeRun(agent);
+    }
+  };
 
-    const result = await runAgentWorkflow(agent.trigger, agent.actions, () => {});
+  const executeRun = async (agent: Agent, triggerInput: { [stepId: string]: any } | null = null) => {
+    if (runningAgentId) return;
+
+    setRunLogs([]); // Clear logs for the new run
+    setRunningAgentId(agent.id);
+    setAgentToTest(null); // Close modal if open
+
+    handleStartEditAgent(agent);
+    
+    const onLog = (log: LogEntry) => setRunLogs(prev => [...prev, log]);
+
+    const result = await runAgentWorkflow(agent.trigger, agent.actions, onLog, agent.systemPrompt, triggerInput);
 
     setAgents(prev => prev.map(a => 
-        a.id === agentId 
+        a.id === agent.id 
             ? { 
                 ...a, 
                 totalRuns: a.totalRuns + 1,
@@ -206,6 +232,7 @@ const App: React.FC = () => {
     
     setRunningAgentId(null);
   };
+
 
   const handleSaveAgent = (agentToSave: Agent) => {
     setAgents(prev => {
@@ -221,11 +248,15 @@ const App: React.FC = () => {
   };
 
   const handleStartCreateAgent = () => {
+    setRunLogs([]); // Clear any old logs
     setEditingAgent(null);
     setPage('builder');
   };
 
   const handleStartEditAgent = (agent: Agent) => {
+    if (editingAgent?.id !== agent.id) {
+        setRunLogs([]); // Clear logs if switching to a different agent
+    }
     setEditingAgent(agent);
     setPage('builder');
   };
@@ -235,6 +266,7 @@ const App: React.FC = () => {
         id: `agent-${Date.now()}`,
         name: template.name,
         description: template.description,
+        systemPrompt: '',
         trigger: template.trigger,
         actions: template.actions,
         status: 'inactive',
@@ -242,12 +274,14 @@ const App: React.FC = () => {
         successfulRuns: 0,
         lastRun: null,
     };
+    setRunLogs([]); // Clear any old logs
     setEditingAgent(agentFromTemplate);
     setPage('builder');
   };
 
   const handleCancelBuilder = () => {
     setEditingAgent(null);
+    setRunLogs([]);
     setPage('dashboard');
   }
 
@@ -255,15 +289,22 @@ const App: React.FC = () => {
   const renderPage = () => {
     switch (page) {
       case 'dashboard':
-        return <Dashboard agents={agents} onNewAgent={handleStartCreateAgent} onEditAgent={handleStartEditAgent} onToggleStatus={handleToggleStatus} onRunAgent={handleRunAgent} runningAgentId={runningAgentId} />;
+        return <Dashboard agents={agents} onNewAgent={handleStartCreateAgent} onEditAgent={handleStartEditAgent} onToggleStatus={handleToggleStatus} onRunAgent={handleInitiateTestRun} runningAgentId={runningAgentId} />;
       case 'builder':
-        return <AgentBuilder agent={editingAgent} agents={agents} onSave={handleSaveAgent} onCancel={handleCancelBuilder} />;
+        return <AgentBuilder 
+                    agent={editingAgent} 
+                    agents={agents} 
+                    onSave={handleSaveAgent} 
+                    onCancel={handleCancelBuilder}
+                    initialLogs={runLogs}
+                    onClearLogs={() => setRunLogs([])}
+                />;
       case 'templates':
           return <Templates onUseTemplate={handleUseTemplate} />;
       case 'integrations':
           return <Integrations connected={connectedIntegrations} onToggleIntegration={handleToggleIntegration} />;
       default:
-        return <Dashboard agents={agents} onNewAgent={handleStartCreateAgent} onEditAgent={handleStartEditAgent} onToggleStatus={handleToggleStatus} onRunAgent={handleRunAgent} runningAgentId={runningAgentId}/>;
+        return <Dashboard agents={agents} onNewAgent={handleStartCreateAgent} onEditAgent={handleStartEditAgent} onToggleStatus={handleToggleStatus} onRunAgent={handleInitiateTestRun} runningAgentId={runningAgentId}/>;
     }
   };
 
@@ -273,6 +314,13 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-y-auto">
         {renderPage()}
       </main>
+      {agentToTest && (
+        <TestRunModal 
+            agent={agentToTest}
+            onClose={() => setAgentToTest(null)}
+            onRun={(triggerOutput) => executeRun(agentToTest, triggerOutput)}
+        />
+      )}
     </div>
   );
 };

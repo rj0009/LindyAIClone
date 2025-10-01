@@ -43,6 +43,7 @@ export interface Agent {
   id: string;
   name: string;
   description: string;
+  systemPrompt?: string;
   trigger: WorkflowStep | null;
   actions: WorkflowStep[][];
   status: 'active' | 'inactive';

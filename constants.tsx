@@ -96,7 +96,11 @@ export const INTEGRATIONS: Integration[] = [
     { id: 'createEvent', name: 'Create Event', description: 'Create a new event in a calendar.', parameters: { title: '', date: '', time: '', description: '' } },
   ]},
   { id: 'hubspot', name: 'HubSpot', description: 'Manage contacts and deals.', color: '#FF7A59', icon: ICONS.hubspot, operations: [
-      { id: 'onNewContact', name: 'On New Contact', description: 'Triggers when a new contact is created.', parameters: {} },
+      { id: 'onNewContact', name: 'On New Contact', description: 'Triggers when a new contact is created.', parameters: {}, outputs: [
+        { id: 'email', name: 'Contact Email' },
+        { id: 'name', name: 'Contact Name' },
+        { id: 'id', name: 'Contact ID' },
+      ]},
       { id: 'createContact', name: 'Create Contact', description: 'Create a new contact record.', parameters: { email: '', name: '' } },
   ]},
   { id: 'salesforce', name: 'Salesforce', description: 'Update CRM records.', color: '#00A1E0', icon: ICONS.salesforce, operations: [
@@ -106,7 +110,10 @@ export const INTEGRATIONS: Integration[] = [
       { id: 'uploadFile', name: 'Upload File', description: 'Upload a new file to a folder.', parameters: { folder: 'root', fileName: 'file.txt', content: '' } },
   ]},
   { id: 'webhook', name: 'Webhook', description: 'Trigger workflows from external services.', color: '#30363D', icon: ICONS.webhook, operations: [
-      { id: 'onWebhook', name: 'On Webhook Call', description: 'Triggers when an HTTP request is received.', parameters: { url: 'https://yourapp.com/webhook/...' } },
+      { id: 'onWebhook', name: 'On Webhook Call', description: 'Triggers when an HTTP request is received.', parameters: { url: 'https://yourapp.com/webhook/...' }, outputs: [
+        { id: 'body', name: 'Request Body' },
+        { id: 'headers', name: 'Request Headers' },
+      ]},
       { id: 'callWebhook', name: 'Call Webhook', description: 'Send an HTTP POST request to a URL.', parameters: { url: '', data: {} } },
   ]},
 ];

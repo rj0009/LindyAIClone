@@ -1,3 +1,4 @@
+
 import { WorkflowStep, LogEntry } from '../types';
 import { generateTextResponse } from './geminiService';
 
@@ -22,7 +23,8 @@ const runBranch = async (
     branch: WorkflowStep[], 
     branchIndex: number,
     onLog: (log: LogEntry) => void,
-    outputs: StepOutputs
+    outputs: StepOutputs,
+    systemPrompt?: string
 ): Promise<boolean> => {
     let branchSuccess = true;
     for (const [index, step] of branch.entries()) {
@@ -47,7 +49,7 @@ const runBranch = async (
                 case 'ai.generateText':
                 case 'ai.analyzeText': {
                     const prompt = resolvedParameters.prompt || resolvedParameters.input || 'Generate a short creative story.';
-                    const aiResponse = await generateTextResponse(prompt);
+                    const aiResponse = await generateTextResponse(prompt, systemPrompt);
                     if (aiResponse.startsWith('Error:')) {
                         stepSuccess = false;
                         failureReason = aiResponse;
@@ -62,8 +64,8 @@ const runBranch = async (
                     const { input, condition, value } = resolvedParameters;
                     let conditionMet = false;
                     switch (condition) {
-                        case 'contains': conditionMet = String(input).includes(String(value)); break;
-                        case 'not_contains': conditionMet = !String(input).includes(String(value)); break;
+                        case 'contains': conditionMet = String(input).toLowerCase().includes(String(value).toLowerCase()); break;
+                        case 'not_contains': conditionMet = !String(input).toLowerCase().includes(String(value).toLowerCase()); break;
                         case 'equals': conditionMet = input == value; break;
                         case 'not_equals': conditionMet = input != value; break;
                         case 'greater_than': conditionMet = Number(input) > Number(value); break;
@@ -111,7 +113,9 @@ const runBranch = async (
 export const runAgentWorkflow = async (
     trigger: WorkflowStep | null,
     actions: WorkflowStep[][], 
-    onLog: (log: LogEntry) => void
+    onLog: (log: LogEntry) => void,
+    systemPrompt?: string,
+    triggerInput?: StepOutputs | null
 ): Promise<{ success: boolean }> => {
     const outputs: StepOutputs = {};
 
@@ -137,25 +141,30 @@ export const runAgentWorkflow = async (
         return { success: false };
     }
     
-    // Simulate dynamic output from the trigger
-    if (trigger.integrationId === 'gmail') {
-        outputs[trigger.id] = {
-            from: 'test-sender@example.com',
-            subject: 'Important: Sales Enquiry',
-            body: 'Hello, I am interested in your product catalog. Can you send me more information? Thanks!',
-        };
+    // Use provided trigger input if available, otherwise use default mock data
+    if (triggerInput && triggerInput[trigger.id]) {
+        outputs[trigger.id] = triggerInput[trigger.id];
     } else {
-         outputs[trigger.id] = {
-            data: { message: 'This is a test webhook payload' },
-            receivedAt: new Date().toISOString(),
-        };
+        // Simulate dynamic output from the trigger
+        if (trigger.integrationId === 'gmail') {
+            outputs[trigger.id] = {
+                from: 'test-sender@example.com',
+                subject: 'Important: Sales Enquiry',
+                body: 'Hello, I am interested in your product catalog. Can you send me more information? Thanks!',
+            };
+        } else {
+            outputs[trigger.id] = {
+                data: { message: 'This is a test webhook payload' },
+                receivedAt: new Date().toISOString(),
+            };
+        }
     }
     
     onLog({ timestamp: new Date().toLocaleTimeString(), status: 'SUCCESS', text: `SUCCESS: Trigger fired successfully. Output:\n${JSON.stringify(outputs[trigger.id], null, 2)}` });
 
 
     // 2. Execute Action Branches in Parallel
-    const branchPromises = actions.map((branch, index) => runBranch(branch, index, onLog, outputs));
+    const branchPromises = actions.map((branch, index) => runBranch(branch, index, onLog, outputs, systemPrompt));
     const results = await Promise.all(branchPromises);
 
     const overallSuccess = results.every(success => success);

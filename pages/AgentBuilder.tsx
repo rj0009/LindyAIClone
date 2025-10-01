@@ -1,18 +1,22 @@
+
 import React, { useState, useEffect } from 'react';
 import { Agent, WorkflowStep, StepType, LogEntry, Integration, IntegrationOperation, OperationOutput } from '../types';
-import { generateWorkflowFromPrompt } from '../services/geminiService';
 import { runAgentWorkflow } from '../services/agentExecutor';
+import { generateAgentConfigAndWorkflowFromPrompt } from '../services/geminiService';
 import WorkflowStepCard from '../components/WorkflowStepCard';
 import StepInspector from '../components/StepInspector';
 import Spinner from '../components/Spinner';
 import { ICONS, INTEGRATIONS } from '../constants';
 import AddActionButton from '../components/AddActionButton';
+import TriggerSelector from '../components/TriggerSelector';
 
 interface AgentBuilderProps {
   agent?: Agent | null;
   agents: Agent[]; // All agents for agent-selection dropdown
   onSave: (agent: Agent) => void;
   onCancel: () => void;
+  initialLogs?: LogEntry[];
+  onClearLogs?: () => void;
 }
 
 const DropIndicator = () => (
@@ -71,18 +75,18 @@ const ActionBranch: React.FC<ActionBranchProps> = ({ branch, branchIndex, onDele
     )
 }
 
-const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, agents, onSave, onCancel }) => {
+const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, agents, onSave, onCancel, initialLogs, onClearLogs }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [prompt, setPrompt] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
   const [trigger, setTrigger] = useState<WorkflowStep | null>(null);
   const [actions, setActions] = useState<WorkflowStep[][]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [runLogs, setRunLogs] = useState<LogEntry[]>([]);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [status, setStatus] = useState<'active' | 'inactive'>('inactive');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'configure' | 'logs'>('configure');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Drag and Drop State
   const [draggedItem, setDraggedItem] = useState<{branchIndex: number, stepIndex: number} | null>(null);
@@ -95,49 +99,49 @@ const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, agents, onSave, onCa
       setDescription(agent.description);
       setTrigger(agent.trigger);
       setActions(agent.actions);
+      setSystemPrompt(agent.systemPrompt || '');
       setAgentId(agent.id);
       setStatus(agent.status);
-      setPrompt('');
       setSelectedStepId(agent.trigger?.id || agent.actions[0]?.[0]?.id || null);
     } else {
       setName('');
       setDescription('');
+      setSystemPrompt('');
       setTrigger(null);
       setActions([]);
       setAgentId(null);
       setStatus('inactive');
-      setPrompt('');
       setSelectedStepId(null);
     }
-    setRunLogs([]);
-    setActiveTab('configure');
+
+    if (initialLogs && initialLogs.length > 0) {
+        setRunLogs(initialLogs);
+        setActiveTab('logs');
+    } else {
+        setRunLogs([]);
+        setActiveTab('configure');
+    }
+
+    return () => {
+        if(onClearLogs) {
+            onClearLogs();
+        }
+    }
   }, [agent]);
 
-  const handleGenerateWorkflow = async () => {
-    if (!prompt) return;
-    setIsLoading(true);
-    setRunLogs([]);
-    const generatedWorkflow = await generateWorkflowFromPrompt(prompt);
-    if (generatedWorkflow.length > 0) {
-        const generatedTrigger = generatedWorkflow.find(step => step.type === StepType.TRIGGER);
-        const generatedActions = generatedWorkflow.filter(step => step.type === StepType.ACTION);
-        setTrigger(generatedTrigger || null);
-        setActions([generatedActions]);
-        setSelectedStepId(generatedTrigger?.id || null);
-    } else {
-        setTrigger(null);
-        setActions([]);
-        setSelectedStepId(null);
-    }
-    setActiveTab('configure');
-    setIsLoading(false);
-  };
+  // Effect to sync logs from parent (App.tsx)
+  useEffect(() => {
+      if (initialLogs) {
+          setRunLogs(initialLogs);
+      }
+  }, [initialLogs]);
   
   const handleSaveAgent = () => {
       const agentData: Agent = {
           id: agentId || `agent-${Date.now()}`,
           name,
           description,
+          systemPrompt,
           trigger,
           actions,
           status,
@@ -151,7 +155,7 @@ const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, agents, onSave, onCa
   const handleTestRun = async () => {
     setRunLogs([]);
     setActiveTab('logs');
-    await runAgentWorkflow(trigger, actions, (log) => setRunLogs(prev => [...prev, log]));
+    await runAgentWorkflow(trigger, actions, (log) => setRunLogs(prev => [...prev, log]), systemPrompt);
   };
   
   const handleUpdateStepParameter = (stepId: string, paramKey: string, paramValue: any) => {
@@ -214,9 +218,50 @@ const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, agents, onSave, onCa
     setActiveTab('configure');
   };
 
+  const handleAddTrigger = (integration: Integration, operation: IntegrationOperation) => {
+    const newTrigger: WorkflowStep = {
+      id: `trigger-${Date.now()}`,
+      type: StepType.TRIGGER,
+      integrationId: integration.id,
+      name: operation.name,
+      operation: operation.id,
+      parameters: { ...operation.parameters }
+    };
+    setTrigger(newTrigger);
+    setSelectedStepId(newTrigger.id);
+  };
+
   const handleAddBranch = () => {
       setActions(prev => [...prev, []]);
   }
+
+  const handleAutoConfigure = async () => {
+    if (!systemPrompt) return;
+
+    setIsGenerating(true);
+    setTrigger(null);
+    setActions([]);
+
+    try {
+        const { agentName, agentDescription, trigger, actions } = await generateAgentConfigAndWorkflowFromPrompt(systemPrompt);
+
+        setName(agentName);
+        setDescription(agentDescription);
+        setTrigger(trigger);
+        setActions(actions);
+        
+        if (trigger) {
+            setSelectedStepId(trigger.id);
+        } else if (actions[0]?.[0]) {
+            setSelectedStepId(actions[0][0].id);
+        }
+
+    } catch (error) {
+        console.error("Failed to generate and configure agent:", error);
+    } finally {
+        setIsGenerating(false);
+    }
+  };
 
   // --- DND Handlers ---
   const handleDragStart = (e: React.DragEvent, location: { branchIndex: number, stepIndex: number }) => {
@@ -325,16 +370,24 @@ const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, agents, onSave, onCa
                     <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Briefly describe what this agent does" className="w-full bg-primary border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent" />
                 </div>
                 <div className="flex-1 flex flex-col">
-                    <label className="block text-sm font-medium text-text-secondary mb-1">Describe Workflow in Plain English</label>
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Agent's Core Instructions (System Prompt)</label>
                     <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="e.g., When a new email arrives in Gmail with 'invoice' in the subject, save the attachment to Google Drive and send a confirmation to the 'billing' Slack channel."
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    placeholder="You are an intelligent, proactive, and empathetic AI agent representing the Housing & Development Board (HDB) of Singapore. Your role is to assist residents, prospective flat buyers, and stakeholders with accurate, up-to-date, and policy-compliant information..."
                     className="w-full bg-primary border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent flex-1"
                     rows={6}
                     />
-                    <button onClick={handleGenerateWorkflow} disabled={isLoading || !prompt} className="mt-4 w-full bg-accent text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-500 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">
-                    {isLoading ? <Spinner /> : <>{ICONS.zap}<span>Generate Workflow</span></>}
+                    <p className="text-xs text-text-secondary mt-2">
+                        This system prompt defines the agent's persona and core instructions. Use it to generate the workflow below.
+                    </p>
+                    <button 
+                        onClick={handleAutoConfigure} 
+                        disabled={!systemPrompt || isGenerating}
+                        className="mt-4 bg-accent/80 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center space-x-2 hover:bg-accent transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+                    >
+                        {isGenerating ? <Spinner /> : ICONS.zap}
+                        <span>{isGenerating ? 'Generating...' : 'Auto-configure & Generate'}</span>
                     </button>
                 </div>
             </div>
@@ -390,10 +443,7 @@ const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, agents, onSave, onCa
         <div className="lg:col-span-1 bg-secondary p-6 rounded-lg border border-border overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">Visual Workflow</h2>
             {!trigger ? (
-                <div className="text-center text-text-secondary py-10 border-2 border-dashed border-border rounded-lg">
-                    <p>Your workflow will appear here.</p>
-                    <p className="text-sm">Generate it from a prompt to get started.</p>
-                </div>
+                <TriggerSelector onAdd={handleAddTrigger} />
             ) : (
                 <div className="flex flex-col items-center">
                     {/* Trigger */}
