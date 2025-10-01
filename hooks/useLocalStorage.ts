@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 
 // A custom hook to manage state in localStorage and sync across tabs.
 function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
-  // Get from local storage, parse stored json, or return initialValue.
-  // This function also seeds localStorage with the initialValue if it's empty.
   const readValue = useCallback((): T => {
     if (typeof window === 'undefined') {
       return initialValue;
@@ -12,17 +10,27 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
     try {
       const item = window.localStorage.getItem(key);
       if (item === null) {
-          // Seed localStorage if it's empty for this key.
-          // If the initial value is a Set, convert it to an array for storage.
-          const valueToStore = initialValue instanceof Set ? Array.from(initialValue) : initialValue;
-          window.localStorage.setItem(key, JSON.stringify(valueToStore));
-          return initialValue;
+        // Seed localStorage if it's empty for this key.
+        const valueToStore = initialValue instanceof Set ? Array.from(initialValue) : initialValue;
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        return initialValue;
       }
+      
       const parsed = JSON.parse(item);
-      // If the initial value was a Set and we're reading an array, convert it back to a Set.
-      if (initialValue instanceof Set && Array.isArray(parsed)) {
-        return new Set(parsed) as T;
+
+      // If the hook is initialized with a Set, we must ensure a Set is returned.
+      if (initialValue instanceof Set) {
+        // If the parsed value from storage is an array, convert it to a Set. This is the happy path.
+        if (Array.isArray(parsed)) {
+          return new Set(parsed) as T;
+        }
+        // If the stored value is not an array, it's malformed.
+        // Fall back to the initial value to prevent runtime errors.
+        console.warn(`localStorage key “${key}” contained malformed data. Falling back to initial state.`);
+        return initialValue;
       }
+
+      // For types other than Set, return the parsed value as is.
       return parsed;
     } catch (error) {
       console.warn(`Error reading localStorage key “${key}”:`, error);
@@ -30,19 +38,13 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
     }
   }, [initialValue, key]);
 
-  // State to store our value.
-  // Pass initial state function to useState so logic is only executed once.
   const [storedValue, setStoredValue] = useState<T>(readValue);
 
-  // Return a wrapped version of useState's setter function that
-  // persists the new value to localStorage.
   const setValue = (value: T | ((val: T) => T)) => {
     try {
-      // Allow value to be a function so we have the same API as useState
       const valueToStore = value instanceof Function ? value(storedValue) : value;
-      // Save state
       setStoredValue(valueToStore);
-      // If the value is a Set, convert it to an array before storing.
+      // If the value is a Set, convert it to an array before stringifying.
       const storableValue = valueToStore instanceof Set ? Array.from(valueToStore) : valueToStore;
       window.localStorage.setItem(key, JSON.stringify(storableValue));
     } catch (error) {
@@ -50,26 +52,27 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
     }
   };
 
-  // Listen for changes to this key in other tabs
   useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === key && event.newValue) {
-          try {
-            const parsed = JSON.parse(event.newValue);
-            // Also handle Set conversion for storage events
-            if (initialValue instanceof Set && Array.isArray(parsed)) {
-                setStoredValue(new Set(parsed) as T);
-            } else {
-                setStoredValue(parsed);
+        try {
+          const parsed = JSON.parse(event.newValue);
+          
+          if (initialValue instanceof Set) {
+            // Only update state if the new value from another tab is a valid array for our Set.
+            if (Array.isArray(parsed)) {
+              setStoredValue(new Set(parsed) as T);
             }
-          } catch (error) {
-            console.warn(`Error parsing localStorage key “${key}” on storage event:`, error);
+          } else {
+            setStoredValue(parsed);
           }
+        } catch (error) {
+          console.warn(`Error parsing localStorage key “${key}” on storage event:`, error);
+        }
       }
     };
 
     window.addEventListener('storage', handleStorageChange);
-
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
