@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Dashboard from './pages/Dashboard';
 import AgentBuilder from './pages/AgentBuilder';
 import Templates from './pages/Templates';
 import Integrations from './pages/Integrations';
 import { Agent, Template, IntegrationId, StepType, LogEntry } from './types';
-import { AGENT_TEMPLATES } from './constants';
+import { AGENT_TEMPLATES, ICONS } from './constants';
 import { runAgentWorkflow } from './services/agentExecutor';
 import useLocalStorage from './hooks/useLocalStorage';
+import useDebouncedEffect from './hooks/useDebouncedEffect';
+import { dataSyncService, SyncedData } from './services/dataSyncService';
+import SyncModal from './components/SyncModal';
 import TestRunModal from './components/TestRunModal';
 
 type Page = 'dashboard' | 'templates' | 'integrations' | 'builder';
@@ -132,11 +135,11 @@ const initialAgents: Agent[] = [
     },
 ];
 
-const Sidebar: React.FC<{ currentPage: Page; setPage: (page: Page) => void }> = ({ currentPage, setPage }) => {
-  const navItems: { id: Page; label: string }[] = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'templates', label: 'Templates' },
-    { id: 'integrations', label: 'Integrations' },
+const Sidebar: React.FC<{ currentPage: Page; setPage: (page: Page) => void; onOpenSyncModal: () => void; }> = ({ currentPage, setPage, onOpenSyncModal }) => {
+  const navItems: { id: Page; label: string; icon: React.ReactElement; }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: ICONS.dashboard },
+    { id: 'templates', label: 'Templates', icon: ICONS.templates },
+    { id: 'integrations', label: 'Integrations', icon: ICONS.integrations },
   ];
 
   return (
@@ -144,21 +147,30 @@ const Sidebar: React.FC<{ currentPage: Page; setPage: (page: Page) => void }> = 
       <div className="px-2 mb-10">
         <h1 className="text-xl font-bold text-white">AgenticGov.ai</h1>
       </div>
-      <nav className="flex flex-col space-y-2">
+      <nav className="flex flex-col space-y-2 flex-1">
         {navItems.map(item => (
           <button
             key={item.id}
             onClick={() => setPage(item.id)}
-            className={`px-4 py-2 text-left rounded-lg transition-colors ${
+            className={`px-4 py-2 text-left rounded-lg transition-colors flex items-center ${
               currentPage === item.id
                 ? 'bg-accent text-white'
                 : 'text-text-secondary hover:bg-border hover:text-text-primary'
             }`}
           >
-            {item.label}
+             {item.icon}
+             <span className="ml-3">{item.label}</span>
           </button>
         ))}
       </nav>
+      <div className="mt-auto">
+        <button
+            onClick={onOpenSyncModal}
+            className="px-4 py-2 text-left rounded-lg transition-colors flex items-center w-full text-text-secondary hover:bg-border hover:text-text-primary"
+          >
+            {ICONS.sync} <span className="ml-3">Sync Settings</span>
+          </button>
+      </div>
     </div>
   );
 };
@@ -166,12 +178,89 @@ const Sidebar: React.FC<{ currentPage: Page; setPage: (page: Page) => void }> = 
 
 const App: React.FC = () => {
   const [page, setPage] = useState<Page>('dashboard');
-  const [agents, setAgents] = useLocalStorage<Agent[]>('agents', initialAgents);
+  
+  // State is now managed with useState, not useLocalStorage, to allow for remote data.
+  const [agents, setAgents] = useState<Agent[]>(initialAgents);
+  const [connectedIntegrations, setConnectedIntegrations] = useState<Set<IntegrationId>>(new Set(['slack', 'ai', 'gmail', 'control', 'agent', 'webhook']));
+  
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [connectedIntegrations, setConnectedIntegrations] = useLocalStorage<Set<IntegrationId>>('connectedIntegrations', new Set(['slack', 'ai', 'gmail', 'control', 'agent', 'webhook']));
   const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
   const [agentToTest, setAgentToTest] = useState<Agent | null>(null);
   const [runLogs, setRunLogs] = useState<LogEntry[]>([]);
+
+  // Sync-related state
+  const [syncId, setSyncId] = useLocalStorage<string | null>('agentic-sync-id', null);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+
+  const loadDataFromSync = useCallback(async (id: string) => {
+    console.log(`Attempting to load data from Sync ID: ${id}`);
+    const data = await dataSyncService.getBin(id);
+    if (data && data.agents && data.connectedIntegrations) {
+        setAgents(data.agents);
+        setConnectedIntegrations(new Set(data.connectedIntegrations as IntegrationId[]));
+        setSyncId(id);
+        console.log("Sync data loaded successfully.");
+    } else {
+        console.error("Failed to load data from sync ID or data was malformed. Clearing bad Sync ID.");
+        setSyncId(null); // Clear bad ID to prevent failed reload loops
+        alert("Could not load data from the provided Sync ID. It might be invalid or expired. Reverting to local data.");
+    }
+    setIsDataLoaded(true);
+  }, [setSyncId]);
+
+  useEffect(() => {
+    if (syncId) {
+        loadDataFromSync(syncId);
+    } else {
+        // Fallback for users without a sync ID. We'll use local storage.
+        const localAgents = localStorage.getItem('agents');
+        const localIntegrations = localStorage.getItem('connectedIntegrations');
+        if (localAgents) {
+            setAgents(JSON.parse(localAgents));
+        }
+        if (localIntegrations) {
+            setConnectedIntegrations(new Set(JSON.parse(localIntegrations)));
+        }
+        setIsDataLoaded(true);
+    }
+  }, [syncId, loadDataFromSync]);
+
+  useDebouncedEffect(() => {
+    if (!isDataLoaded) return; // Prevent overwriting initial state before data is loaded
+
+    if (syncId) {
+        const dataToSync: SyncedData = {
+            agents,
+            connectedIntegrations: Array.from(connectedIntegrations)
+        };
+        console.log("Saving data to sync bin...");
+        dataSyncService.updateBin(syncId, dataToSync);
+    } else {
+        // Fallback to local storage if not syncing
+        localStorage.setItem('agents', JSON.stringify(agents));
+        localStorage.setItem('connectedIntegrations', JSON.stringify(Array.from(connectedIntegrations)));
+    }
+  }, 1000, [agents, connectedIntegrations, syncId, isDataLoaded]);
+
+  const handleLoadFromId = async (id: string) => {
+    await loadDataFromSync(id);
+  };
+
+  const handleCreateNewSync = async () => {
+    const dataToSync: SyncedData = {
+        agents,
+        connectedIntegrations: Array.from(connectedIntegrations)
+    };
+    const newId = await dataSyncService.createBin(dataToSync);
+    if (newId) {
+        setSyncId(newId);
+    } else {
+        alert("Error: Could not create a new sync session. Please try again.");
+    }
+  };
+
 
   const handleDeleteAgent = (agentId: string) => {
     setAgents(prev => prev.filter(a => a.id !== agentId));
@@ -313,7 +402,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-primary">
-      <Sidebar currentPage={page} setPage={setPage} />
+      <Sidebar currentPage={page} setPage={setPage} onOpenSyncModal={() => setIsSyncModalOpen(true)} />
       <main className="flex-1 overflow-y-auto">
         {renderPage()}
       </main>
@@ -322,6 +411,14 @@ const App: React.FC = () => {
             agent={agentToTest}
             onClose={() => setAgentToTest(null)}
             onRun={(triggerOutput) => executeRun(agentToTest, triggerOutput)}
+        />
+      )}
+      {isSyncModalOpen && (
+        <SyncModal 
+            currentSyncId={syncId}
+            onClose={() => setIsSyncModalOpen(false)}
+            onLoadFromId={handleLoadFromId}
+            onCreateNew={handleCreateNewSync}
         />
       )}
     </div>
