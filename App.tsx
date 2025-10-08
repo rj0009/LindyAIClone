@@ -7,7 +7,7 @@ import { Agent, Template, IntegrationId, StepType, LogEntry } from './types';
 import { AGENT_TEMPLATES, ICONS } from './constants';
 import { runAgentWorkflow } from './services/agentExecutor';
 import TestRunModal from './components/TestRunModal';
-import { supabase } from './services/supabaseClient';
+import useLocalStorage from './hooks/useLocalStorage';
 import Spinner from './components/Spinner';
 
 type Page = 'dashboard' | 'templates' | 'integrations' | 'builder';
@@ -168,107 +168,22 @@ const Sidebar: React.FC<{ currentPage: Page; setPage: (page: Page) => void; }> =
 
 const App: React.FC = () => {
   const [page, setPage] = useState<Page>('dashboard');
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [connectedIntegrations, setConnectedIntegrations] = useState<Set<IntegrationId>>(new Set());
+  const [agents, setAgents] = useLocalStorage<Agent[]>('agents', initialAgents);
+  const [connectedIntegrations, setConnectedIntegrations] = useLocalStorage<Set<IntegrationId>>('connectedIntegrations', new Set(['slack', 'ai', 'gmail', 'control', 'agent', 'webhook']));
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
   const [agentToTest, setAgentToTest] = useState<Agent | null>(null);
   const [runLogs, setRunLogs] = useState<LogEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!supabase) {
-        setError('Database connection not configured.');
-        setAgents(initialAgents);
-        setConnectedIntegrations(new Set(['slack', 'ai', 'gmail', 'control', 'agent', 'webhook']));
-        setIsLoading(false);
-        return;
-      }
-      
-      setIsLoading(true);
-      setError(null);
-  
-      // Fetch Agents
-      const { data: fetchedAgents, error: agentsError } = await supabase.from('agents').select('*');
-      
-      if (agentsError) {
-        setError('Failed to fetch agents.');
-        console.error("Supabase error fetching agents:", agentsError);
-      } else if (fetchedAgents && fetchedAgents.length > 0) {
-        setAgents(fetchedAgents);
-      } else if (fetchedAgents) {
-        // Seed database if empty for this user
-        console.log("No agents found, seeding database...");
-        const { error: insertError } = await supabase.from('agents').insert(initialAgents as any);
-        if (insertError) {
-            setError('Failed to seed initial agents.');
-            console.error("Supabase error seeding agents:", insertError);
-        } else {
-            setAgents(initialAgents);
-        }
-      }
-  
-      // Fetch Integrations
-      const { data: settings, error: settingsError } = await supabase.from('user_settings').select('connected_integrations').single();
-
-      if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 means no rows found, which is fine for a new user
-          setError('Failed to fetch settings.');
-          console.error("Supabase error fetching settings:", settingsError);
-      } else if (settings?.connected_integrations) {
-          setConnectedIntegrations(new Set(settings.connected_integrations as IntegrationId[]));
-      } else {
-           // Seed with default integrations if none found
-          const defaultIntegrations = Array.from(new Set(['slack', 'ai', 'gmail', 'control', 'agent', 'webhook']));
-          const { error: insertError } = await supabase.from('user_settings').upsert({ id: 1, connected_integrations: defaultIntegrations });
-          if (insertError) {
-              setError('Failed to save initial settings.');
-              console.error("Supabase error seeding settings:", insertError);
-          } else {
-              setConnectedIntegrations(new Set(defaultIntegrations));
-          }
-      }
-      setIsLoading(false);
-    };
-  
-    fetchData();
-  }, []);
-
-  const handleDeleteAgent = async (agentId: string) => {
-    const originalAgents = agents;
+  const handleDeleteAgent = (agentId: string) => {
     setAgents(prev => prev.filter(a => a.id !== agentId));
-    
-    if (supabase) {
-        const { error } = await supabase.from('agents').delete().match({ id: agentId });
-        if (error) {
-            console.error('Failed to delete agent:', error);
-            setAgents(originalAgents); // Rollback on failure
-            alert('Error: Could not delete agent from the database.');
-        }
-    }
   };
 
-  const handleToggleStatus = async (agentId: string) => {
-    const agent = agents.find(a => a.id === agentId);
-    if (!agent) return;
-    const newStatus = agent.status === 'active' ? 'inactive' : 'active';
-
-    const originalAgents = agents;
-    setAgents(prev => prev.map(a => a.id === agentId ? { ...a, status: newStatus } : a ));
-
-    if (supabase) {
-        const { error } = await supabase.from('agents').update({ status: newStatus }).match({ id: agentId });
-        if (error) {
-            console.error('Failed to toggle agent status:', error);
-            setAgents(originalAgents); // Rollback
-            alert('Error: Could not update agent status.');
-        }
-    }
+  const handleToggleStatus = (agentId: string) => {
+    setAgents(prev => prev.map(a => a.id === agentId ? { ...a, status: a.status === 'active' ? 'inactive' : 'active' } : a ));
   };
 
-  const handleToggleIntegration = async (id: IntegrationId) => {
-    const originalIntegrations = new Set(connectedIntegrations);
+  const handleToggleIntegration = (id: IntegrationId) => {
     const newSet = new Set(connectedIntegrations);
     if (newSet.has(id)) {
         newSet.delete(id);
@@ -276,15 +191,6 @@ const App: React.FC = () => {
         newSet.add(id);
     }
     setConnectedIntegrations(newSet);
-
-    if (supabase) {
-        const { error } = await supabase.from('user_settings').upsert({ id: 1, connected_integrations: Array.from(newSet) });
-        if (error) {
-            console.error('Failed to update integrations:', error);
-            setConnectedIntegrations(originalIntegrations); // Rollback
-            alert('Error: Could not save integration settings.');
-        }
-    }
   };
   
   const handleInitiateTestRun = (agentId: string) => {
@@ -319,50 +225,16 @@ const App: React.FC = () => {
 
     setAgents(prev => prev.map(a => a.id === agent.id ? updatedAgent : a));
     
-    if (supabase) {
-        const { error } = await supabase.from('agents').update({
-            totalRuns: updatedAgent.totalRuns,
-            successfulRuns: updatedAgent.successfulRuns,
-            lastRun: updatedAgent.lastRun,
-        }).match({ id: agent.id });
-
-        if (error) {
-            console.error('Failed to update agent run stats:', error);
-            // The local state is updated, so we don't rollback, just log the error.
-        }
-    }
-    
     setRunningAgentId(null);
   };
 
-  const handleSaveAgent = async (agentToSave: Agent) => {
+  const handleSaveAgent = (agentToSave: Agent) => {
     const agentExists = agents.some(a => a.id === agentToSave.id);
     
-    if (supabase) {
-      if (agentExists) {
-        const { data, error } = await supabase.from('agents').update(agentToSave as any).match({ id: agentToSave.id }).select();
-        if (error || !data) {
-          console.error("Failed to update agent:", error);
-          alert("Error: Could not save agent.");
-          return;
-        }
-        setAgents(prev => prev.map(a => a.id === agentToSave.id ? data[0] : a));
-      } else {
-        const { data, error } = await supabase.from('agents').insert(agentToSave as any).select();
-        if (error || !data) {
-          console.error("Failed to create agent:", error);
-          alert("Error: Could not create agent.");
-          return;
-        }
-        setAgents(prev => [...prev, data[0]]);
-      }
+    if (agentExists) {
+        setAgents(prev => prev.map(a => a.id === agentToSave.id ? agentToSave : a));
     } else {
-        // Fallback for no DB connection
-        if (agentExists) {
-            setAgents(prev => prev.map(a => a.id === agentToSave.id ? agentToSave : a));
-        } else {
-            setAgents(prev => [...prev, agentToSave]);
-        }
+        setAgents(prev => [...prev, agentToSave]);
     }
 
     setEditingAgent(null);
@@ -409,24 +281,6 @@ const App: React.FC = () => {
 
 
   const renderPage = () => {
-    if (isLoading) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full">
-            <Spinner />
-            <p className="mt-4 text-text-secondary">Loading agents...</p>
-        </div>
-      );
-    }
-    if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                <h2 className="text-2xl text-red-400 mb-4">Connection Error</h2>
-                <p className="text-text-secondary mb-2">{error}</p>
-                <p className="text-xs text-text-secondary">Please ensure Supabase environment variables (SUPABASE_URL, SUPABASE_ANON_KEY) are correctly configured and reload the page.</p>
-            </div>
-        );
-    }
-
     switch (page) {
       case 'dashboard':
         return <Dashboard agents={agents} onNewAgent={handleStartCreateAgent} onEditAgent={handleStartEditAgent} onToggleStatus={handleToggleStatus} onRunAgent={handleInitiateTestRun} runningAgentId={runningAgentId} onDeleteAgent={handleDeleteAgent} />;
