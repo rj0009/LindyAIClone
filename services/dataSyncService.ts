@@ -1,6 +1,9 @@
 import { Agent, IntegrationId } from '../types';
 
-const API_BASE = 'https://jsonblob.com/api/jsonBlob';
+// FIX: Replaced jsonblob.com with npoint.io, a more reliable service for this use case
+// that provides stable anonymous JSON storage with permissive CORS headers, which should
+// resolve the "Failed to fetch" error.
+const API_BASE = 'https://api.npoint.io/bins';
 
 export interface SyncedData {
     agents: Agent[];
@@ -19,10 +22,9 @@ export const dataSyncService = {
                 body: JSON.stringify(data),
             });
             if (!response.ok) throw new Error(`Failed to create sync bin. Status: ${response.status}`);
-            const newBinUrl = response.headers.get('Location');
-            if (!newBinUrl) throw new Error('Could not get new bin URL from response.');
-            const binId = newBinUrl.split('/').pop();
-            return binId || null;
+            // npoint.io returns the ID in the JSON response body, not the Location header.
+            const result = await response.json();
+            return result.id || null;
         } catch (error) {
             console.error('Data Sync Error (createBin):', error);
             return null;
