@@ -1,9 +1,9 @@
 import { Agent, IntegrationId } from '../types';
 
-// FIX: Replaced jsonblob.com with npoint.io, a more reliable service for this use case
-// that provides stable anonymous JSON storage with permissive CORS headers, which should
-// resolve the "Failed to fetch" error.
-const API_BASE = 'https://api.npoint.io/bins';
+// FIX: The API endpoint for npoint.io was incorrect, causing a 404 error.
+// The '/bins' path should not be part of the base URL. This has been corrected
+// to point to the root domain for creating bins and the correct path for access.
+const API_BASE = 'https://api.npoint.io';
 
 export interface SyncedData {
     agents: Agent[];
@@ -13,6 +13,7 @@ export interface SyncedData {
 export const dataSyncService = {
     createBin: async (data: SyncedData): Promise<string | null> => {
         try {
+            // POST to the base URL to create a new bin
             const response = await fetch(API_BASE, {
                 method: 'POST',
                 headers: {
@@ -22,7 +23,6 @@ export const dataSyncService = {
                 body: JSON.stringify(data),
             });
             if (!response.ok) throw new Error(`Failed to create sync bin. Status: ${response.status}`);
-            // npoint.io returns the ID in the JSON response body, not the Location header.
             const result = await response.json();
             return result.id || null;
         } catch (error) {
@@ -33,6 +33,7 @@ export const dataSyncService = {
 
     getBin: async (id: string): Promise<SyncedData | null> => {
         try {
+            // GET from the base URL + ID to retrieve a bin
             const response = await fetch(`${API_BASE}/${id}`, {
                 method: 'GET',
                 headers: {
@@ -49,6 +50,7 @@ export const dataSyncService = {
 
     updateBin: async (id: string, data: SyncedData): Promise<boolean> => {
         try {
+            // PUT to the base URL + ID to update a bin
             const response = await fetch(`${API_BASE}/${id}`, {
                 method: 'PUT',
                 headers: {
