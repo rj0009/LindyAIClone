@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Agent, WorkflowStep, StepType, LogEntry, Integration, IntegrationOperation, OperationOutput } from '../types';
 import { runAgentWorkflow } from '../services/agentExecutor';
@@ -245,8 +246,12 @@ const AgentBuilder: React.FC<AgentBuilderProps> = ({ agent, agents, onSave, onCa
     try {
         const { agentName, agentDescription, trigger, actions } = await generateAgentConfigAndWorkflowFromPrompt(systemPrompt);
 
-        setName(agentName);
-        setDescription(agentDescription);
+        if (!name) {
+          setName(agentName);
+        }
+        if (!description) {
+          setDescription(agentDescription);
+        }
         setTrigger(trigger);
         setActions(actions);
         
